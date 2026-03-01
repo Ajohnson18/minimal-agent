@@ -1,0 +1,31 @@
+# Browser Sandbox Dockerfile
+# Runs Chromium with Xvfb (virtual display) and exposes CDP for automation
+# Runs Chromium with Xvfb (virtual display) and exposes CDP for automation
+
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        chromium \
+        curl \
+        fonts-liberation \
+        fonts-noto-color-emoji \
+        jq \
+        novnc \
+        socat \
+        websockify \
+        x11vnc \
+        xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/browser-entrypoint.sh /usr/local/bin/browser-entrypoint
+RUN chmod +x /usr/local/bin/browser-entrypoint
+
+# CDP port, VNC port, noVNC port
+EXPOSE 9222 5900 6080
+
+CMD ["browser-entrypoint"]

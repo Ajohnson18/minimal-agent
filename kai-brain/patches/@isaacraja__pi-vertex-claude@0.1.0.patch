@@ -1,0 +1,91 @@
+diff --git a/index.ts b/index.ts
+index 1ecdbde74f49958bf62a9d69c4b366340928c9bd..4373cc427a670beaa400205164ddf8b46758e206 100644
+--- a/index.ts
++++ b/index.ts
+@@ -48,6 +48,19 @@ import { homedir } from "node:os";
+ import { join } from "node:path";
+ import { parse as partialParse } from "partial-json";
+ 
++// =============================================================================
++// Extended Options Interface
++// =============================================================================
++
++/**
++ * Extended stream options that support region parameter.
++ * This prevents concurrent request conflicts by allowing each request
++ * to specify its own region without mutating global process.env.
++ */
++export interface ExtendedStreamOptions extends SimpleStreamOptions {
++	region?: string;
++}
++
+ // =============================================================================
+ // Models from models.dev google-vertex-anthropic
+ // Pricing from: https://cloud.google.com/vertex-ai/generative-ai/pricing#partner-models
+@@ -213,7 +226,7 @@ export function convertMessages(messages: Message[], model: Model<Api>): any[] {
+ 						? { type: "text" as const, text: sanitizeSurrogates(item.text) }
+ 						: {
+ 								type: "image" as const,
+-								source: { type: "base64" as const, media_type: item.mimeType, data: item.data },
++								source: { type: "base64" as const, media_type: item.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: item.data },
+ 							},
+ 				);
+ 				// Filter out images if model doesn't support them
+@@ -342,6 +355,27 @@ export function parseStreamingJson(partialJson: string): Record<string, any> {
+ 	}
+ }
+ 
++// =============================================================================
++// Region Extraction Helpers
++// =============================================================================
++
++/**
++ * Extract region from model baseUrl.
++ * Format: https://us-east5-aiplatform.googleapis.com → us-east5
++ */
++function extractRegionFromBaseUrl(baseUrl?: string): string | undefined {
++	if (!baseUrl) return undefined;
++	try {
++		const url = new URL(baseUrl);
++		// Format: https://<region>-aiplatform.googleapis.com
++		// Extract: <region>
++		const match = url.hostname.match(/^([a-z0-9-]+)-aiplatform\.googleapis\.com$/);
++		return match?.[1];
++	} catch {
++		return undefined;
++	}
++}
++
+ // =============================================================================
+ // Streaming Implementation
+ // =============================================================================
+@@ -349,7 +383,7 @@ export function parseStreamingJson(partialJson: string): Record<string, any> {
+ export function streamVertexClaude(
+ 	model: Model<Api>,
+ 	context: Context,
+-	options?: SimpleStreamOptions,
++	options?: ExtendedStreamOptions,
+ ): AssistantMessageEventStream {
+ 	const stream = createAssistantMessageEventStream();
+ 
+@@ -375,7 +409,10 @@ export function streamVertexClaude(
+ 		try {
+ 			// Get project and region from environment
+ 			const projectInfo = resolveProjectId();
+-			const region = process.env.GOOGLE_CLOUD_LOCATION || process.env.CLOUD_ML_REGION || "us-east5";
++			// PATCH: Extract region from options, model baseUrl, or env vars (in priority order)
++			// This prevents concurrent request conflicts by avoiding global process.env mutation
++			const region =
++				options?.region || extractRegionFromBaseUrl(model.baseUrl) || process.env.GOOGLE_CLOUD_LOCATION || process.env.CLOUD_ML_REGION || "us-east5";
+ 
+ 			if (!projectInfo) {
+ 				throw new Error(
+@@ -392,7 +429,7 @@ export function streamVertexClaude(
+ 			}
+ 
+ 			// Configure beta features for thinking and fine-grained streaming
+-			const betaFeatures = ["fine-grained-tool-streaming-2025-05-14", "interleaved-thinking-2025-05-14"];
++			const betaFeatures = ["fine-grained-tool-streaming-2025-05-14", "interleaved-thinking-2025-05-14", "context-1m-2025-08-07"];
+ 
+ 			// Create AnthropicVertex client - uses Google ADC automatically
+ 			const client = new AnthropicVertex({

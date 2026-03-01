@@ -1,0 +1,3 @@
+[submodule "kai-brain"]
+	path = kai-brain
+	url = git@github.com:CLX-Labs/ava-agent.git

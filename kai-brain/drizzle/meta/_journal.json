@@ -1,0 +1,132 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1769865029402,
+      "tag": "0000_nervous_praxagora",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769865030402,
+      "tag": "0001_add_unique_external_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769865031402,
+      "tag": "0002_add_embedding_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769865032402,
+      "tag": "0003_add_queue_and_cron",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769865033402,
+      "tag": "0004_add_system_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769865034402,
+      "tag": "0005_add_memory_fts_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769865035402,
+      "tag": "0006_exec_approval_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769865036402,
+      "tag": "0007_heartbeat_subagent_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1769865037402,
+      "tag": "0008_outbound_lifecycle_parity",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1769865038402,
+      "tag": "0009_hardcut_foundations",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1769865039402,
+      "tag": "0010_hardcut_sessionkey_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1769865040402,
+      "tag": "0011_subagent_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1769865041402,
+      "tag": "0012_system_event_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1769865042402,
+      "tag": "0013_hardcut_reconcile",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1772072367935,
+      "tag": "0014_add_user_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1772082400000,
+      "tag": "0015_add_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1772265600000,
+      "tag": "0016_power_refinements",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1772352000000,
+      "tag": "0017_dashboard_artifacts",
+      "breakpoints": true
+    }
+  ]
+}

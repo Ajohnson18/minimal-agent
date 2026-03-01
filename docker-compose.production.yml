@@ -1,0 +1,62 @@
+# Kai — Local Development / Single-VM Deployment
+# Usage:
+#   1. Copy .env:  cp .env.example .env  → fill in your keys
+#   2. Log in:     echo $GHCR_TOKEN | docker login ghcr.io -u <username> --password-stdin
+#   3. Run:        docker compose -f docker-compose.production.yml up -d
+#   4. Open:       http://localhost:3000
+
+services:
+  kai-brain:
+    image: ghcr.io/clx-labs/kai-brain:${KAI_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "${BRAIN_HTTP_PORT:-3001}:3001"
+      - "${BRAIN_WS_PORT:-18789}:18789"
+    volumes:
+      - ./kai-brain-config.json:/tmp/kai/config.json:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kai/.sandbox:/tmp/kai/.sandbox
+      - ./kai-data/workspace:/root/.ava/workspace
+      - ./kai-data/skills:/root/.ava/skills
+      - ./kai-data/powers:/root/.ava/powers
+    environment:
+      DATABASE_URL: postgresql://kai:${POSTGRES_PASSWORD:-kai}@postgres:5432/kai
+      JWT_SECRET: ${JWT_SECRET:-changeme-generate-a-real-secret}
+      NODE_ENV: production
+      AVA_CONFIG_PATH: /tmp/kai/config.json
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SKILLS_DIR: /root/.ava/skills
+      POWERS_DIR: /root/.ava/powers
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kai-face:
+    image: ghcr.io/clx-labs/kai-face:${KAI_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "${FACE_PORT:-3000}:3000"
+    environment:
+      KAI_BRAIN_URL: http://kai-brain:3001
+      KAI_BRAIN_WS_URL: ws://kai-brain:18789
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kai}
+      POSTGRES_DB: kai
+    volumes:
+      - kai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  kai_pgdata:

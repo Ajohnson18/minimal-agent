@@ -1,0 +1,50 @@
+# Kai — Local development with live builds
+# Usage: docker compose -f docker-compose.dev.yml up --build
+
+services:
+  kai-brain:
+    build: ./kai-brain
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+      - "18789:18789"
+    volumes:
+      - ./kai-brain-config.json:/tmp/kai/config.json:ro
+      - ./kai-data/workspace:/root/.ava/workspace
+      - ./kai-data/skills:/root/.ava/skills
+      - ./kai-data/powers:/root/.ava/powers
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://kai:${POSTGRES_PASSWORD:-kai}@postgres:5432/kai
+      AVA_CONFIG_PATH: /tmp/kai/config.json
+      SKILLS_DIR: /root/.ava/skills
+      POWERS_DIR: /root/.ava/powers
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kai-face:
+    build: ./kai-face
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kai
+      POSTGRES_PASSWORD: kai
+      POSTGRES_DB: kai
+    ports:
+      - "5432:5432"
+    volumes:
+      - kai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kai"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  kai_pgdata:

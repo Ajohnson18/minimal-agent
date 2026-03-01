@@ -1,0 +1,159 @@
+{
+  "version": "1.0",
+
+  "agent": {
+    "model": {
+      "primary": "claude-sonnet-4-6",
+      "fallback": "gemini-2.5-flash",
+      "provider": "vertex",
+      "embedding": "text-embedding-004"
+    },
+    "routing": {
+      "simple": "gemini-2.5-flash",
+      "medium": "claude-sonnet-4-6@default",
+      "complex": "claude-opus-4-6",
+      "vision": "gemini-2.5-flash"
+    },
+    "context": {
+      "maxTokens": 100000,
+      "compactionThreshold": 40,
+      "maxMessagesPerSession": 800,
+      "keepRecentMessages": 30
+    },
+    "memory": {
+      "searchLimit": 12,
+      "minScore": 0.7
+    }
+  },
+
+  "subagents": {
+    "models": {
+      "research": "gemini-2.5-flash",
+      "analyze": "gemini-2.5-pro",
+      "code": "gemini-2.5-flash",
+      "general": "gemini-2.5-flash"
+    },
+    "orchestration": {
+      "mode": "async",
+      "allowSessionOverride": true,
+      "supervisor": {
+        "maxAttempts": 3,
+        "baseBackoffMs": 10000,
+        "maxBackoffMs": 90000,
+        "maxWorkflowMs": 7200000,
+        "statusUpdateMs": 20000
+      }
+    },
+    "maxDepth": 2,
+    "maxChildren": 5,
+    "defaultTimeoutMs": 0,
+    "maxConcurrent": 12,
+    "maxArchived": 300
+  },
+
+  "slack": {
+    "ackEmoji": "eyes",
+    "ackReactionScope": "all",
+    "reactionNotifications": "off",
+    "defaultRequireMention": true,
+    "humanDelay": {
+      "mode": "off",
+      "minMs": 0,
+      "maxMs": 0
+    },
+    "threadHistoryLimit": 20,
+    "maxConcurrentRuns": 12,
+    "replyToMode": "all",
+    "queueMode": "steer-backlog",
+    "inboundDebounceMs": 1200,
+    "inboundDedupeTtlMs": 60000,
+    "inboundDedupeMaxSize": 1000,
+    "interactionDedupeTtlMs": 300000,
+    "interactionDedupeMaxSize": 2000,
+    "missingThreadCacheTtlMs": 60000,
+    "missingThreadCacheMaxSize": 1000,
+    "threadHistoryScope": "thread",
+    "mentionGatingMode": "default",
+    "ttsMode": "off",
+    "nativeStreaming": false,
+    "typing": {
+      "keepaliveMs": 8000,
+      "maxDurationMs": 1800000
+    }
+  },
+
+  "tools": {
+    "exec": {
+      "host": "sandbox",
+      "security": "full",
+      "ask": "on-miss",
+      "askFallback": "deny",
+      "allowlist": [],
+      "yieldMs": 10000,
+      "maxOutputChars": 200000,
+      "backgroundMs": 10000,
+      "timeoutSec": 3600,
+      "approvalRunningNoticeMs": 10000,
+      "jobTtlMs": 86400000,
+      "maxRunning": 120,
+      "maxFinished": 800,
+      "safeBinTrustedDirs": [
+        "/bin",
+        "/usr/bin",
+        "/usr/local/bin",
+        "/sbin",
+        "/usr/sbin"
+      ]
+    },
+    "sql": {
+      "maxRows": 100000,
+      "queryTimeoutMs": 30000
+    },
+    "browser": {
+      "mode": "sandbox"
+    }
+  },
+
+  "server": {
+    "port": 3001,
+    "gatewayPort": 18789,
+    "gatewayPath": "/ws",
+    "apiPrefix": "/api/ava",
+    "allowedOrigins": ["http://localhost:3000", "https://ava.somethings.com"],
+    "auth": {
+      "required": true,
+      "wsAllowQueryToken": true,
+      "issuer": "",
+      "audience": ""
+    }
+  },
+
+  "heartbeat": {
+    "enabled": true,
+    "intervalMs": 1800000,
+    "target": "last",
+    "to": "",
+    "accountId": ""
+  },
+
+  "cron": {
+    "maxConcurrentRuns": 4
+  },
+
+  "logging": {
+    "level": "info"
+  },
+
+  "vertex": {
+    "location": "us-central1",
+    "anthropicLocation": "us-east5"
+  },
+
+  "users": {
+    "enforceRoles": true
+  },
+
+  "sandbox": {
+    "mode": "off"
+  }
+}

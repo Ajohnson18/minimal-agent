@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AVA Gateway WS Smoke Test</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --line: #374151;
+      --btn: #2563eb;
+      --btn-2: #4b5563;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+    p {
+      margin: 0 0 16px;
+      color: var(--muted);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .row {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 8px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    label {
+      font-size: 12px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      background: var(--btn);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: var(--btn-2);
+    }
+    button.warn {
+      background: #b45309;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #0b1220;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--err);
+    }
+    .dot.open { background: var(--ok); }
+    .dot.connecting { background: var(--warn); }
+    .help {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    pre {
+      margin: 0;
+      background: #020617;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      max-height: 420px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .line-in { color: #a7f3d0; }
+    .line-out { color: #bfdbfe; }
+    .line-info { color: #d1d5db; }
+    .line-err { color: #fca5a5; }
+    @media (max-width: 900px) {
+      .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>AVA Gateway WebSocket Smoke Test</h1>
+    <p>Quick manual tester for typed-frame WS flow: <code>connect.challenge -> connect -> req/res + events</code>.</p>
+
+    <div class="panel">
+      <div class="status"><span id="ws-dot" class="dot"></span><span id="ws-state">closed</span></div>
+      <div class="row">
+        <div class="col-8">
+          <label for="ws-url">WebSocket URL</label>
+          <input id="ws-url" />
+        </div>
+        <div class="col-4">
+          <label for="ws-token">JWT Token (optional; added as <code>?token=</code>)</label>
+          <input id="ws-token" type="password" placeholder="eyJ..." />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-4">
+          <label for="api-base-url">API Base URL (for create session)</label>
+          <input id="api-base-url" placeholder="http://localhost:3001/api/ava" />
+        </div>
+        <div class="col-4">
+          <label for="connect-nonce">Connect Nonce (auto-filled from <code>connect.challenge</code>)</label>
+          <input id="connect-nonce" placeholder="auto from challenge" />
+        </div>
+        <div class="col-4">
+          <label for="session-key">Session Key</label>
+          <input id="session-key" placeholder="agent:main:main:..." />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12">
+          <label>
+            <input id="cap-tool-events" type="checkbox" />
+            Include <code>tool-events</code> capability in <code>connect</code> (required for tool/thinking event stream)
+          </label>
+        </div>
+      </div>
+      <div class="buttons">
+        <button id="open-btn">Open Socket</button>
+        <button id="close-btn" class="secondary">Close Socket</button>
+        <button id="connect-btn">Send connect</button>
+        <button id="create-session-btn">Create Session</button>
+        <button id="subscribe-btn" class="secondary">Subscribe</button>
+        <button id="unsubscribe-btn" class="secondary">Unsubscribe</button>
+      </div>
+      <div class="help">If auth is required and browser headers cannot be set, enable query-token mode server-side and use the token field.</div>
+      <div class="help">WS chat supports <code>attachments</code> payloads. Use presets below or provide custom JSON.</div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <div class="col-4">
+          <label for="events-input">Subscribe Events (comma-separated)</label>
+          <input id="events-input" value="chat,agent,session.*" />
+        </div>
+        <div class="col-4">
+          <label for="history-limit">History Limit</label>
+          <input id="history-limit" type="number" min="1" max="1000" value="50" />
+        </div>
+        <div class="col-4">
+          <label for="abort-run-id">Abort Run ID (optional)</label>
+          <input id="abort-run-id" placeholder="run id from chat.send result" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12">
+          <label for="chat-message">Chat Message</label>
+          <textarea id="chat-message" placeholder="hello from ws smoke page"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12">
+          <label for="chat-attachments-json">Attachments JSON (optional)</label>
+          <textarea id="chat-attachments-json" placeholder='[{"type":"image","mimeType":"image/png","fileName":"dot.png","content":"..."}]'></textarea>
+          <div class="help">If <code>message</code> is empty, at least one valid attachment is required.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-8">
+          <label for="attachment-file-input">Load Local File Into Attachments</label>
+          <input id="attachment-file-input" type="file" accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json" />
+        </div>
+      </div>
+      <div class="buttons">
+        <button id="sessions-list-btn" class="secondary">sessions.list</button>
+        <button id="sessions-preview-btn" class="secondary">sessions.preview</button>
+        <button id="chat-send-btn">chat.send</button>
+        <button id="chat-history-btn" class="secondary">chat.history</button>
+        <button id="chat-abort-btn" class="warn">chat.abort</button>
+      </div>
+      <div class="buttons">
+        <button id="fill-image-attachment-btn" class="secondary">Fill Image Attachment</button>
+        <button id="fill-doc-attachment-btn" class="secondary">Fill Doc Attachment</button>
+        <button id="fill-invalid-attachment-btn" class="warn">Fill Invalid Attachment</button>
+        <button id="load-file-attachment-btn" class="secondary">Load Selected File</button>
+        <button id="clear-attachments-btn" class="secondary">Clear Attachments</button>
+        <button id="run-attachment-smoke-btn">Run Attachment Smoke</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <div class="col-4">
+          <label for="raw-method">Raw Method</label>
+          <input id="raw-method" value="sessions.list" />
+        </div>
+        <div class="col-8">
+          <label for="raw-params">Raw Params (JSON object)</label>
+          <textarea id="raw-params">{}</textarea>
+        </div>
+      </div>
+      <div class="buttons">
+        <button id="raw-send-btn">Send Raw RPC</button>
+        <button id="clear-log-btn" class="secondary">Clear Log</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <label>Traffic Log</label>
+      <pre id="log"></pre>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const logEl = $("log");
+      const wsDot = $("ws-dot");
+      const wsState = $("ws-state");
+
+      const wsUrlInput = $("ws-url");
+      const tokenInput = $("ws-token");
+      const apiBaseUrlInput = $("api-base-url");
+      const nonceInput = $("connect-nonce");
+      const sessionKeyInput = $("session-key");
+      const capToolEventsInput = $("cap-tool-events");
+      const eventsInput = $("events-input");
+      const historyLimitInput = $("history-limit");
+      const abortRunIdInput = $("abort-run-id");
+      const chatMessageInput = $("chat-message");
+      const chatAttachmentsInput = $("chat-attachments-json");
+      const attachmentFileInput = $("attachment-file-input");
+      const rawMethodInput = $("raw-method");
+      const rawParamsInput = $("raw-params");
+
+      const openBtn = $("open-btn");
+      const closeBtn = $("close-btn");
+      const connectBtn = $("connect-btn");
+      const createSessionBtn = $("create-session-btn");
+      const subscribeBtn = $("subscribe-btn");
+      const unsubscribeBtn = $("unsubscribe-btn");
+      const sessionsListBtn = $("sessions-list-btn");
+      const sessionsPreviewBtn = $("sessions-preview-btn");
+      const chatSendBtn = $("chat-send-btn");
+      const chatHistoryBtn = $("chat-history-btn");
+      const chatAbortBtn = $("chat-abort-btn");
+      const fillImageAttachmentBtn = $("fill-image-attachment-btn");
+      const fillDocAttachmentBtn = $("fill-doc-attachment-btn");
+      const fillInvalidAttachmentBtn = $("fill-invalid-attachment-btn");
+      const loadFileAttachmentBtn = $("load-file-attachment-btn");
+      const clearAttachmentsBtn = $("clear-attachments-btn");
+      const runAttachmentSmokeBtn = $("run-attachment-smoke-btn");
+      const rawSendBtn = $("raw-send-btn");
+      const clearLogBtn = $("clear-log-btn");
+
+      let ws = null;
+      let reqCounter = 0;
+      const pending = new Map();
+      const TEST_PNG_BASE64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAF/gL+W6m4AAAAAElFTkSuQmCC";
+
+      function defaultWsUrl() {
+        if (location.protocol === "http:" || location.protocol === "https:") {
+          const proto = location.protocol === "https:" ? "wss:" : "ws:";
+          return proto + "//" + location.hostname + ":18789/ws";
+        }
+        return "ws://localhost:18789/ws";
+      }
+
+      function deriveApiBaseFromWsUrl(wsUrl) {
+        try {
+          const parsed = new URL(wsUrl);
+          const proto = parsed.protocol === "wss:" ? "https:" : "http:";
+          const port = parsed.port === "18789" ? "3001" : parsed.port;
+          const host = parsed.hostname;
+          const withPort = port ? ":" + port : "";
+          return proto + "//" + host + withPort + "/api/ava";
+        } catch {
+          return "http://localhost:3001/api/ava";
+        }
+      }
+
+      function getApiBaseCandidates() {
+        const explicit = apiBaseUrlInput.value.trim();
+        if (explicit) return [explicit];
+
+        const wsRaw = wsUrlInput.value.trim();
+        const out = [];
+        try {
+          const parsed = new URL(wsRaw);
+          const proto = parsed.protocol === "wss:" ? "https:" : "http:";
+          const host = parsed.hostname;
+          const push = (port) => {
+            const withPort = port ? ":" + port : "";
+            const base = proto + "//" + host + withPort + "/api/ava";
+            if (!out.includes(base)) out.push(base);
+          };
+          push("3001");
+          push("8080");
+          push(parsed.port);
+        } catch {
+          out.push("http://localhost:3001/api/ava");
+          out.push("http://localhost:8080/api/ava");
+        }
+        return out;
+      }
+
+      wsUrlInput.value = defaultWsUrl();
+      apiBaseUrlInput.value = deriveApiBaseFromWsUrl(wsUrlInput.value);
+      wsUrlInput.addEventListener("change", function () {
+        if (!apiBaseUrlInput.value.trim()) {
+          apiBaseUrlInput.value = deriveApiBaseFromWsUrl(wsUrlInput.value);
+        }
+      });
+
+      function setWsState(state) {
+        wsState.textContent = state;
+        wsDot.className = "dot";
+        if (state === "open") wsDot.classList.add("open");
+        if (state === "connecting") wsDot.classList.add("connecting");
+      }
+
+      function appendLog(type, value) {
+        const ts = new Date().toISOString();
+        const line = document.createElement("div");
+        line.className =
+          type === "in"
+            ? "line-in"
+            : type === "out"
+              ? "line-out"
+              : type === "err"
+                ? "line-err"
+                : "line-info";
+        const printable = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+        line.textContent = "[" + ts + "] " + printable;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function parseEventsList() {
+        return eventsInput.value
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function makeIdempotencyKey(prefix) {
+        return (
+          prefix +
+          "-" +
+          Date.now() +
+          "-" +
+          Math.random().toString(36).slice(2, 8)
+        );
+      }
+
+      function buildImageAttachment() {
+        return {
+          type: "image",
+          mimeType: "image/png",
+          fileName: "dot.png",
+          content: "data:image/png;base64," + TEST_PNG_BASE64,
+        };
+      }
+
+      function buildDocAttachment() {
+        return {
+          type: "file",
+          mimeType: "text/plain",
+          fileName: "notes.txt",
+          content: btoa("Attachment smoke test " + new Date().toISOString()),
+        };
+      }
+
+      function buildInvalidAttachment() {
+        return {
+          type: "file",
+          mimeType: "application/zip",
+          fileName: "archive.zip",
+          content: btoa("zip-bytes"),
+        };
+      }
+
+      function inferAttachmentType(mimeType) {
+        if (typeof mimeType === "string" && mimeType.toLowerCase().startsWith("image/")) {
+          return "image";
+        }
+        return "file";
+      }
+
+      async function loadSelectedFileAttachment() {
+        const file = attachmentFileInput.files && attachmentFileInput.files[0];
+        if (!file) {
+          throw new Error("No file selected");
+        }
+        const dataUrl = await new Promise(function (resolve, reject) {
+          const reader = new FileReader();
+          reader.onerror = function () {
+            reject(new Error("Failed to read selected file"));
+          };
+          reader.onload = function () {
+            resolve(String(reader.result || ""));
+          };
+          reader.readAsDataURL(file);
+        });
+        return {
+          type: inferAttachmentType(file.type),
+          mimeType: file.type || undefined,
+          fileName: file.name || "upload.bin",
+          content: dataUrl,
+        };
+      }
+
+      function setAttachmentsJson(value) {
+        chatAttachmentsInput.value = JSON.stringify(value, null, 2);
+      }
+
+      function parseAttachmentsJson() {
+        const raw = chatAttachmentsInput.value.trim();
+        if (!raw) {
+          return [];
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (error) {
+          throw new Error("Invalid attachments JSON: " + String(error));
+        }
+        if (!Array.isArray(parsed)) {
+          throw new Error("attachments JSON must be an array");
+        }
+        return parsed;
+      }
+
+      function buildWsUrlWithToken() {
+        const base = wsUrlInput.value.trim();
+        const token = tokenInput.value.trim();
+        if (!token) return base;
+        try {
+          const u = new URL(base);
+          u.searchParams.set("token", token);
+          return u.toString();
+        } catch {
+          const glue = base.includes("?") ? "&" : "?";
+          return base + glue + "token=" + encodeURIComponent(token);
+        }
+      }
+
+      function sendFrame(frame) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          appendLog("err", "Socket is not open");
+          return;
+        }
+        ws.send(JSON.stringify(frame));
+        appendLog("out", frame);
+      }
+
+      function rpc(method, params) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          return Promise.reject(new Error("Socket is not open"));
+        }
+        const id = "web-" + Date.now() + "-" + (++reqCounter);
+        const frame = { type: "req", id, method, params: params || {} };
+        sendFrame(frame);
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error("RPC timeout for " + method));
+          }, 12000);
+          pending.set(id, { resolve, reject, timeout, method });
+        });
+      }
+
+      async function sendConnect() {
+        const nonce = nonceInput.value.trim();
+        if (!nonce) {
+          appendLog("err", "No nonce yet. Wait for connect.challenge first.");
+          return;
+        }
+        try {
+          const caps = ["chat.send", "chat.history", "chat.abort"];
+          if (capToolEventsInput.checked) {
+            caps.push("tool-events");
+          }
+          const payload = await rpc("connect", {
+            nonce,
+            client: {
+              id: "ws-smoke-page",
+              name: "ws-smoke-page",
+              version: "1",
+              platform: navigator.platform || "browser",
+            },
+            caps,
+          });
+          appendLog("info", { connectResult: payload });
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      }
+
+      async function openSocket() {
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          appendLog("info", "Socket already open/connecting");
+          return;
+        }
+        const target = buildWsUrlWithToken();
+        appendLog("info", "Opening " + target);
+        setWsState("connecting");
+
+        ws = new WebSocket(target);
+        ws.onopen = function () {
+          appendLog("info", "Socket open");
+          setWsState("open");
+        };
+
+        ws.onmessage = function (event) {
+          let msg = event.data;
+          try {
+            msg = JSON.parse(event.data);
+          } catch {
+            appendLog("in", event.data);
+            return;
+          }
+          appendLog("in", msg);
+
+          if (
+            msg &&
+            msg.type === "event" &&
+            msg.event === "connect.challenge" &&
+            msg.payload &&
+            typeof msg.payload.nonce === "string"
+          ) {
+            nonceInput.value = msg.payload.nonce;
+          }
+
+          if (
+            msg &&
+            msg.type === "event" &&
+            msg.event === "agent"
+          ) {
+            appendLog("info", {
+              toolStreamEvent: msg.payload && msg.payload.stream ? msg.payload.stream : "agent",
+              payload: msg.payload,
+            });
+          }
+
+          if (msg && msg.type === "res" && typeof msg.id === "string") {
+            const pendingReq = pending.get(msg.id);
+            if (pendingReq) {
+              clearTimeout(pendingReq.timeout);
+              pending.delete(msg.id);
+              if (msg.ok) {
+                pendingReq.resolve(msg.payload);
+              } else {
+                pendingReq.reject(
+                  new Error((msg.error && msg.error.message) || "RPC error"),
+                );
+              }
+            }
+          }
+        };
+
+        ws.onclose = function (event) {
+          appendLog("info", "Socket closed code=" + event.code + " reason=" + (event.reason || "(none)"));
+          setWsState("closed");
+          for (const [, pendingReq] of pending.entries()) {
+            clearTimeout(pendingReq.timeout);
+            pendingReq.reject(new Error("Socket closed"));
+          }
+          pending.clear();
+        };
+
+        ws.onerror = function () {
+          appendLog("err", "Socket error");
+        };
+      }
+
+      async function createSession() {
+        const token = tokenInput.value.trim();
+        if (!token) {
+          appendLog("err", "JWT token is required to create session");
+          return;
+        }
+
+        const baseCandidates = getApiBaseCandidates();
+        const title = "WS Smoke " + new Date().toISOString();
+
+        try {
+          let sessionId = "";
+          let sessionsBase = "";
+          const attemptErrors = [];
+
+          for (const base of baseCandidates) {
+            const sessionsUrl = base.replace(/\/+$/, "") + "/sessions";
+            appendLog("info", { createSessionAttempt: sessionsUrl });
+            try {
+              const createRes = await fetch(sessionsUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: "Bearer " + token,
+                },
+                body: JSON.stringify({ title }),
+              });
+              const body = await createRes.json().catch(() => ({}));
+              if (!createRes.ok) {
+                attemptErrors.push({
+                  base,
+                  status: createRes.status,
+                  body,
+                });
+                continue;
+              }
+
+              sessionsBase = base;
+              sessionId =
+                body &&
+                body.session &&
+                typeof body.session.id === "string"
+                  ? body.session.id
+                  : "";
+              break;
+            } catch (error) {
+              attemptErrors.push({ base, error: String(error) });
+            }
+          }
+
+          if (!sessionsBase) {
+            appendLog("err", {
+              createSessionFailed: true,
+              attempts: attemptErrors,
+              hint:
+                "Check API port/path and CORS. Browser origin must be in server.allowedOrigins.",
+              currentOrigin: location.origin,
+              defaultTryOrder: baseCandidates,
+            });
+            return;
+          }
+
+          appendLog("info", {
+            sessionCreated: true,
+            apiBase: sessionsBase,
+            sessionId,
+            title,
+          });
+
+          if (!sessionId) {
+            appendLog("err", "Session created but missing id in response");
+            return;
+          }
+
+          const getRes = await fetch(
+            sessionsBase.replace(/\/+$/, "") + "/sessions/" + encodeURIComponent(sessionId),
+            {
+              method: "GET",
+              headers: {
+                Authorization: "Bearer " + token,
+              },
+            },
+          );
+          const getBody = await getRes.json().catch(() => ({}));
+          if (!getRes.ok) {
+            appendLog("err", {
+              fetchSessionFailed: true,
+              status: getRes.status,
+              body: getBody,
+            });
+            return;
+          }
+
+          const sessionKey =
+            getBody &&
+            getBody.session &&
+            typeof getBody.session.sessionKey === "string"
+              ? getBody.session.sessionKey
+              : "";
+
+          let resolvedSessionKey = sessionKey;
+          if (!resolvedSessionKey && ws && ws.readyState === WebSocket.OPEN) {
+            try {
+              const listResult = await rpc("sessions.list", { limit: 100 });
+              const sessions = listResult && Array.isArray(listResult.sessions)
+                ? listResult.sessions
+                : [];
+              const matched = sessions.find((s) => s && s.title === title) || sessions[0];
+              if (matched && typeof matched.sessionKey === "string") {
+                resolvedSessionKey = matched.sessionKey;
+                appendLog("info", {
+                  sessionKeyRecoveredFromWsList: true,
+                  sessionKey: resolvedSessionKey,
+                });
+              }
+            } catch (error) {
+              appendLog("err", "Failed to recover sessionKey via WS list: " + String(error));
+            }
+          }
+
+          if (!resolvedSessionKey) {
+            appendLog("err", "Session found but sessionKey missing");
+            return;
+          }
+
+          sessionKeyInput.value = resolvedSessionKey;
+          appendLog("info", { sessionKeyReady: resolvedSessionKey });
+        } catch (error) {
+          appendLog("err", "Create session failed: " + String(error));
+        }
+      }
+
+      function closeSocket() {
+        if (!ws) return;
+        ws.close(1000, "manual close");
+      }
+
+      openBtn.addEventListener("click", openSocket);
+      closeBtn.addEventListener("click", closeSocket);
+      connectBtn.addEventListener("click", sendConnect);
+      createSessionBtn.addEventListener("click", createSession);
+
+      subscribeBtn.addEventListener("click", async function () {
+        const sessionKey = sessionKeyInput.value.trim();
+        const params = { events: parseEventsList() };
+        if (sessionKey) params.sessionKey = sessionKey;
+        try {
+          const result = await rpc("subscribe", params);
+          appendLog("info", { subscribed: result });
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      unsubscribeBtn.addEventListener("click", async function () {
+        try {
+          const result = await rpc("unsubscribe", { events: parseEventsList() });
+          appendLog("info", { unsubscribed: result });
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      sessionsListBtn.addEventListener("click", async function () {
+        try {
+          const result = await rpc("sessions.list", {
+            limit: Number(historyLimitInput.value || "20"),
+          });
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      sessionsPreviewBtn.addEventListener("click", async function () {
+        try {
+          const result = await rpc("sessions.preview", {
+            limit: Number(historyLimitInput.value || "20"),
+          });
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      chatSendBtn.addEventListener("click", async function () {
+        const sessionKey = sessionKeyInput.value.trim();
+        const message = chatMessageInput.value.trim();
+        let attachments;
+        try {
+          attachments = parseAttachmentsJson();
+        } catch (error) {
+          appendLog("err", String(error));
+          return;
+        }
+        if (!sessionKey) {
+          appendLog("err", "sessionKey is required for chat.send");
+          return;
+        }
+        if (!message && attachments.length === 0) {
+          appendLog("err", "message or at least one attachment is required for chat.send");
+          return;
+        }
+        const idempotencyKey = makeIdempotencyKey("ws-smoke");
+        try {
+          const params = {
+            sessionKey,
+            message,
+            idempotencyKey,
+          };
+          if (attachments.length > 0) {
+            params.attachments = attachments;
+          }
+          const result = await rpc("chat.send", params);
+          if (result && typeof result.runId === "string") {
+            abortRunIdInput.value = result.runId;
+          }
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      fillImageAttachmentBtn.addEventListener("click", function () {
+        setAttachmentsJson([buildImageAttachment()]);
+      });
+
+      fillDocAttachmentBtn.addEventListener("click", function () {
+        setAttachmentsJson([buildDocAttachment()]);
+      });
+
+      fillInvalidAttachmentBtn.addEventListener("click", function () {
+        setAttachmentsJson([buildInvalidAttachment()]);
+      });
+
+      loadFileAttachmentBtn.addEventListener("click", async function () {
+        try {
+          const attachment = await loadSelectedFileAttachment();
+          setAttachmentsJson([attachment]);
+          appendLog("info", {
+            loadedAttachment: {
+              type: attachment.type,
+              mimeType: attachment.mimeType,
+              fileName: attachment.fileName,
+            },
+          });
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      clearAttachmentsBtn.addEventListener("click", function () {
+        chatAttachmentsInput.value = "";
+      });
+
+      runAttachmentSmokeBtn.addEventListener("click", async function () {
+        const sessionKey = sessionKeyInput.value.trim();
+        if (!sessionKey) {
+          appendLog("err", "sessionKey is required for attachment smoke run");
+          return;
+        }
+        let passed = 0;
+        let failed = 0;
+
+        async function runStep(name, fn) {
+          try {
+            await fn();
+            passed += 1;
+            appendLog("info", "PASS: " + name);
+          } catch (error) {
+            failed += 1;
+            appendLog("err", "FAIL: " + name + " -> " + String(error));
+          }
+        }
+
+        appendLog("info", "Starting attachment smoke run...");
+
+        await runStep("chat.send accepts image attachment only", async function () {
+          const result = await rpc("chat.send", {
+            sessionKey,
+            message: "",
+            idempotencyKey: makeIdempotencyKey("ws-attach-image"),
+            attachments: [buildImageAttachment()],
+          });
+          if (!result || typeof result.runId !== "string" || result.runId.trim().length === 0) {
+            throw new Error("missing runId in image send result");
+          }
+        });
+
+        await runStep("chat.send accepts document attachment only", async function () {
+          const result = await rpc("chat.send", {
+            sessionKey,
+            message: "",
+            idempotencyKey: makeIdempotencyKey("ws-attach-doc"),
+            attachments: [buildDocAttachment()],
+          });
+          if (!result || typeof result.runId !== "string" || result.runId.trim().length === 0) {
+            throw new Error("missing runId in doc send result");
+          }
+        });
+
+        await runStep("chat.send rejects unsupported attachment type", async function () {
+          let rejected = false;
+          try {
+            await rpc("chat.send", {
+              sessionKey,
+              message: "",
+              idempotencyKey: makeIdempotencyKey("ws-attach-invalid"),
+              attachments: [buildInvalidAttachment()],
+            });
+          } catch (error) {
+            rejected = true;
+            const text = String(error).toLowerCase();
+            if (!text.includes("unsupported") && !text.includes("invalid")) {
+              throw new Error("unexpected error for invalid attachment: " + String(error));
+            }
+          }
+          if (!rejected) {
+            throw new Error("expected invalid attachment to fail");
+          }
+        });
+
+        await runStep("chat.history redacts attachment binary data", async function () {
+          await sleep(1200);
+          const history = await rpc("chat.history", {
+            sessionKey,
+            limit: Number(historyLimitInput.value || "50"),
+          });
+          const messages = history && Array.isArray(history.messages) ? history.messages : [];
+          const redactedFound = messages.some(function (message) {
+            if (!message || typeof message !== "object") return false;
+            const content = message.content;
+            if (!Array.isArray(content)) return false;
+            return content.some(function (block) {
+              if (!block || typeof block !== "object") return false;
+              if (block.omitted !== true) return false;
+              if (typeof block.bytes !== "number") return false;
+              if (typeof block.data === "string") return false;
+              if (typeof block.base64 === "string") return false;
+              if (typeof block.contentBase64 === "string") return false;
+              return true;
+            });
+          });
+          if (!redactedFound) {
+            throw new Error("no redacted attachment block found in chat.history");
+          }
+        });
+
+        appendLog("info", "Attachment smoke completed: " + passed + " passed, " + failed + " failed");
+      });
+
+      chatHistoryBtn.addEventListener("click", async function () {
+        const sessionKey = sessionKeyInput.value.trim();
+        if (!sessionKey) {
+          appendLog("err", "sessionKey is required for chat.history");
+          return;
+        }
+        try {
+          const result = await rpc("chat.history", {
+            sessionKey,
+            limit: Number(historyLimitInput.value || "50"),
+          });
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      chatAbortBtn.addEventListener("click", async function () {
+        const sessionKey = sessionKeyInput.value.trim();
+        if (!sessionKey) {
+          appendLog("err", "sessionKey is required for chat.abort");
+          return;
+        }
+        const runId = abortRunIdInput.value.trim();
+        const params = { sessionKey };
+        if (runId) params.runId = runId;
+        try {
+          const result = await rpc("chat.abort", params);
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      rawSendBtn.addEventListener("click", async function () {
+        const method = rawMethodInput.value.trim();
+        if (!method) {
+          appendLog("err", "Method is required");
+          return;
+        }
+        let params;
+        try {
+          params = rawParamsInput.value.trim() ? JSON.parse(rawParamsInput.value) : {};
+        } catch (error) {
+          appendLog("err", "Invalid raw params JSON: " + String(error));
+          return;
+        }
+        try {
+          const result = await rpc(method, params);
+          appendLog("info", result);
+        } catch (error) {
+          appendLog("err", String(error));
+        }
+      });
+
+      clearLogBtn.addEventListener("click", function () {
+        logEl.innerHTML = "";
+      });
+
+      setWsState("closed");
+    })();
+  </script>
+</body>
+</html>

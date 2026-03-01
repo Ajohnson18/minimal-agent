@@ -1,0 +1,66 @@
+name: Process E2E Soak (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Number of soak iterations"
+        required: false
+        default: "100"
+      pattern:
+        description: "Optional vitest -t pattern override"
+        required: false
+        default: ""
+
+env:
+  AVA_AUTH_REQUIRED: "1"
+  AVA_WS_ALLOW_QUERY_TOKEN: "1"
+
+jobs:
+  process_e2e_soak:
+    name: Process E2E Soak
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: manual-soak-jwt-secret
+      VERTEX_AI_PROJECT_ID: manual-soak-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"manual-soak-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: manual-soak-signing-secret
+      SLACK_BOT_TOKEN: xoxb-manual-soak-token
+      AVA_FAIL_ON_SKIP: "1"
+      AVA_PROCESS_E2E_SOAK_ITERATIONS: ${{ inputs.iterations }}
+      AVA_PROCESS_E2E_SOAK_PATTERN: ${{ inputs.pattern }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:classification
+      - run: pnpm test:process-e2e:soak
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manual-process-e2e-soak-reports
+          path: reports/vitest-junit.xml

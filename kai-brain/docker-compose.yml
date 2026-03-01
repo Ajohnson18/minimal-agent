@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ava-postgres
+    environment:
+      POSTGRES_USER: ava
+      POSTGRES_PASSWORD: ava_dev_password
+      POSTGRES_DB: ava_dev
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflicts with existing PostgreSQL
+    volumes:
+      - ava_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ava -d ava_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  browser-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox-browser
+    container_name: ava-browser-sandbox
+    ports:
+      - "9222:9222"  # CDP (Chrome DevTools Protocol)
+      - "6080:6080"  # noVNC web interface (optional, for debugging)
+    environment:
+      - BROWSER_HEADLESS=0  # 0 = use Xvfb display, 1 = headless
+      - BROWSER_ENABLE_NOVNC=1
+      - BROWSER_XVFB_WIDTH=1920
+      - BROWSER_XVFB_HEIGHT=1080
+      - BROWSER_WINDOW_WIDTH=1920
+      - BROWSER_WINDOW_HEIGHT=1080
+      - BROWSER_VIEWPORT_WIDTH=1920
+      - BROWSER_VIEWPORT_HEIGHT=1080
+    volumes:
+      - browser_data:/tmp/browser-home/.chrome
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9222/json/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ava_postgres_data:
+  browser_data:

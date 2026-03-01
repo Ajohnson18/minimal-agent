@@ -1,0 +1,382 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AVA_FAIL_ON_SKIP: "1"
+  AVA_AUTH_REQUIRED: "1"
+  AVA_WS_ALLOW_QUERY_TOKEN: "1"
+
+jobs:
+  lint_typecheck:
+    name: Lint + Typecheck
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-reports
+          path: reports/vitest-junit.xml
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-reports
+          path: reports/vitest-junit.xml
+
+  contract:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:classification
+      - run: pnpm test:contract
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-reports
+          path: reports/vitest-junit.xml
+
+  process_e2e:
+    name: Process E2E Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:classification
+      - run: pnpm test:process-e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: process-e2e-reports
+          path: reports/vitest-junit.xml
+
+  mutation_calibration:
+    name: Mutation Kill Smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:mutation:smoke
+
+  reliability:
+    name: Reliability Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+      AVA_OUTBOUND_DURABLE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:classification
+      - run: pnpm test:reliability:quarantine
+      - run: pnpm test:reliability:mock-guard
+      - run: pnpm test:reliability
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reliability-reports
+          path: |
+            reports/vitest-junit.xml
+            reports/reliability-quarantine-summary.md
+
+  coverage:
+    name: Coverage 85%
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-artifacts
+          path: |
+            coverage/**
+            reports/vitest-junit.xml
+
+  coverage_core:
+    name: Core Coverage 90%
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: ci-jwt-secret
+      VERTEX_AI_PROJECT_ID: ci-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"ci-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: ci-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:coverage:core
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-coverage-artifacts
+          path: |
+            coverage/core/**
+            reports/vitest-junit.xml

@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.skill-node-group {
+  will-change: transform;
+}
+

@@ -1,0 +1,84 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Drizzle
+drizzle/meta/*
+!drizzle/meta/
+!drizzle/meta/_journal.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+output.txt
+
+# Sandbox workspace
+.sandbox/
+test.py
+
+# Agent scratch workspace (temp files, charts, exports)
+.scratch/
+
+# Workspace repos and config (local only)
+workspace/
+/config/
+.clawhub/
+TODO.md
+scripts/refresh-linear-token.sh
+.state/
+.claude/
+somethings-db/
+.ava-bugs/
+
+# Config (deployment-specific)
+config.json
+
+# Workspace config (symlinked to somethings-ava-config repo)
+workspace-config
+
+# Runtime memory logs
+memory/
+
+# Scratch / dev artifacts
+BUGS.md
+AGENTS.md
+SOUL.md
+USER.md
+TEAM.md
+IDENTITY.md
+MEMORY.md
+*.json
+!drizzle/meta/_journal.json
+generate_dashboard.py
+update_pr.py
+pr_description.md
+description.md
+test.txt
+src/scripts/test-gemini-3-1.ts
+PARITY.md

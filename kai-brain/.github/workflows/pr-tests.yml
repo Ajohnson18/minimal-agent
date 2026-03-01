@@ -1,0 +1,177 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  normal_tests:
+    if: ${{ github.event.pull_request.draft == false }}
+    name: Normal Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      AVA_FAIL_ON_SKIP: "1"
+      AVA_AUTH_REQUIRED: "1"
+      AVA_WS_ALLOW_QUERY_TOKEN: "1"
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: pr-jwt-secret
+      VERTEX_AI_PROJECT_ID: pr-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"pr-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: pr-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-pr-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:classification
+      - run: pnpm test:parallel
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-test-reports
+          path: reports/vitest-junit.xml
+
+  reliability:
+    if: ${{ github.event.pull_request.draft == false }}
+    needs: normal_tests
+    name: Reliability Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      AVA_FAIL_ON_SKIP: "1"
+      AVA_AUTH_REQUIRED: "1"
+      AVA_WS_ALLOW_QUERY_TOKEN: "1"
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: pr-jwt-secret
+      VERTEX_AI_PROJECT_ID: pr-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"pr-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: pr-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-pr-token
+      AVA_OUTBOUND_DURABLE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:classification
+      - run: pnpm test:reliability:quarantine
+      - run: pnpm test:reliability:mock-guard
+      - run: pnpm test:reliability
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-reliability-reports
+          path: |
+            reports/vitest-junit.xml
+            reports/reliability-quarantine-summary.md
+
+  mutation_calibration:
+    if: ${{ github.event.pull_request.draft == false }}
+    needs: normal_tests
+    name: Mutation Kill Smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ava_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ava_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: true
+      AVA_FAIL_ON_SKIP: "1"
+      AVA_AUTH_REQUIRED: "1"
+      AVA_WS_ALLOW_QUERY_TOKEN: "1"
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      AVA_TEST_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/ava_test
+      JWT_SECRET: pr-jwt-secret
+      VERTEX_AI_PROJECT_ID: pr-project
+      VERTEX_AI_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"pr-project"}'
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SLACK_SIGNING_SECRET: pr-slack-signing-secret
+      SLACK_BOT_TOKEN: xoxb-pr-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push:ci
+      - run: pnpm test:mutation:smoke
