@@ -252,7 +252,11 @@ export function getPiModel(provider: Provider, modelId?: string): Model<any> {
     const region = getConfig().vertex.location;
     console.log(`[MODEL] Routing ${effectiveModelId} → ${region} (Gemini)`);
     try {
-      return getModel("google-vertex" as any, effectiveModelId as any);
+      const vertexModel = getModel("google-vertex" as any, effectiveModelId as any);
+      if (!vertexModel) {
+        throw new Error(`Model not found: google-vertex/${effectiveModelId}`);
+      }
+      return vertexModel;
     } catch (error) {
       throw new Error(`Model not found: google-vertex/${effectiveModelId}. Error: ${error}`);
     }
@@ -261,7 +265,11 @@ export function getPiModel(provider: Provider, modelId?: string): Model<any> {
   // Non-vertex providers
   const effectiveProvider = provider === "google" ? "google" : provider;
   try {
-    return getModel(effectiveProvider as any, effectiveModelId as any);
+    const found = getModel(effectiveProvider as any, effectiveModelId as any);
+    if (!found) {
+      throw new Error(`Model not found: ${effectiveProvider}/${effectiveModelId}`);
+    }
+    return found;
   } catch (error) {
     throw new Error(`Model not found: ${effectiveProvider}/${effectiveModelId}. Error: ${error}`);
   }
