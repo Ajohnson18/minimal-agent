@@ -127,6 +127,8 @@ export interface SpawnSubagentOptions {
   };
   /** Pre-resolved user context from parent (avoids redundant DB fetch) */
   parentUserContext?: import("./user-context.js").UserContext;
+  /** Parent trace ID for linking this subagent run in Langfuse hierarchy */
+  parentTraceId?: string;
 }
 
 export interface SubagentResult {
@@ -315,6 +317,7 @@ export async function spawnSubagent(
     sessionId,
     userId,
     input: task.slice(0, 500),
+    parentTraceId: options.parentTraceId,
     metadata: {
       depth: currentDepth,
       parentSessionId,

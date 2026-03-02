@@ -768,6 +768,12 @@ function boolEnv(key: string): boolean | undefined {
   return v === "true" || v === "1";
 }
 
+/** Read a string env var, stripping any inline comment (# …) and trimming whitespace. */
+function strEnv(key: string): string | undefined {
+  const val = process.env[key]?.split("#")[0].trim();
+  return val || undefined;
+}
+
 function csvEnv(key: string): string[] | undefined {
   const value = process.env[key];
   if (!value) return undefined;
@@ -834,15 +840,15 @@ function resolve(file: Static<typeof ConfigSchema> | null): ResolvedConfig {
     agent: {
       model: {
         primary:
-          process.env.LLM_MODEL ??
+          strEnv("LLM_MODEL") ??
           agent?.model?.primary ??
           d.agent.model.primary,
         fallback:
-          process.env.LLM_FALLBACK_MODEL ??
+          strEnv("LLM_FALLBACK_MODEL") ??
           agent?.model?.fallback ??
           d.agent.model.fallback,
         provider:
-          process.env.LLM_PROVIDER ??
+          strEnv("LLM_PROVIDER") ??
           agent?.model?.provider ??
           d.agent.model.provider,
         embedding:
@@ -1010,7 +1016,7 @@ function resolve(file: Static<typeof ConfigSchema> | null): ResolvedConfig {
         sub?.maxArchived ??
         d.subagents.maxArchived,
       defaultModel:
-        process.env.SUBAGENT_DEFAULT_MODEL ??
+        strEnv("SUBAGENT_DEFAULT_MODEL") ??
         sub?.defaultModel ??
         d.subagents.defaultModel,
     },

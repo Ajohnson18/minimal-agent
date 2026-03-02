@@ -103,6 +103,8 @@ export interface ExecuteAgentOptions {
   userContext?: UserContext;
   /** Internal recursive failover guard. */
   __attemptedModelRefs?: string[];
+  /** Internal: carry existing trace through failover recursion to avoid orphaned traces. */
+  __existingTrace?: TraceHandle;
   /** Internal guard for overflow recovery retries. */
   __overflowRecoveryState?: {
     compactionRetried?: boolean;
@@ -149,6 +151,8 @@ export interface ExecuteAgentResult {
     totalTokens: number;
   };
   messages: Message[];
+  modelId: string;
+  provider: Provider;
 }
 
 interface ResolveSandboxContextOptions {
@@ -361,8 +365,8 @@ export async function executeAgentWithPi(
     );
   }
 
-  // Start Langfuse trace for this agent run
-  const trace = startTrace({
+  // Start Langfuse trace for this agent run (reuse existing trace on failover)
+  const trace = options.__existingTrace ?? startTrace({
     name: "agent-run",
     sessionId,
     userId,
@@ -438,6 +442,7 @@ export async function executeAgentWithPi(
     userContext,
     sandboxContainer,
     sessionSource,
+    parentTraceId: trace.traceId,
   });
 
   // 5c. Load workspace context files (AGENTS.md, SOUL.md, TEAM.md, IDENTITY.md)
@@ -562,13 +567,21 @@ export async function executeAgentWithPi(
   let didCompact = false;
   const loopGuard = new ToolLoopGuard();
 
-  const activeToolSpans = new Map<string, SpanHandle>();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  const activeToolSpans = new Map<string, SpanHandle[]>();
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     if (event.type === "message_end" && event.message?.role === "assistant") {
       const text = extractAssistantText([event.message as Message]);
       if (text) collectedAssistantTexts.push(text);
       const calls = extractToolCalls([event.message as Message]);
       if (calls.length > 0) collectedToolCalls.push(...calls);
+      // Accumulate token usage across all turns
+      const msg = event.message as AssistantMessage;
+      if (msg.usage) {
+        totalInputTokens = msg.usage.input;   // last wins — reflects full context window
+        totalOutputTokens += msg.usage.output; // sum — accumulate all generated tokens
+      }
     }
     if (event.type === "auto_compaction_end") {
       didCompact = true;
@@ -625,10 +638,6 @@ export async function executeAgentWithPi(
     },
     "Context ready",
   );
-
-  // 11. Track usage
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
 
   // Abort the pi-agent session when abort signal fires (stops LLM stream + tool loop)
   // Also cascade-stop any running subagents
@@ -689,6 +698,7 @@ export async function executeAgentWithPi(
           })
         : null;
 
+    const generationStartTime = Date.now();
     const messageCountBefore = session.messages.length;
 
     try {
@@ -749,11 +759,6 @@ export async function executeAgentWithPi(
           ? lastAssistant.errorMessage.trim()
           : "Model returned error stopReason";
       throw new Error(providerError);
-    }
-
-    if (lastAssistant?.usage) {
-      totalInputTokens = lastAssistant.usage.input;
-      totalOutputTokens = lastAssistant.usage.output;
     }
 
     // Diagnostic: detect zero-token responses
@@ -853,6 +858,7 @@ export async function executeAgentWithPi(
       name: "llm-response",
       model: modelId,
       input: prompt.slice(0, 1000),
+      startTime: generationStartTime,
     });
     gen.end({
       output: assistantContent.slice(0, 2000),
@@ -893,6 +899,8 @@ export async function executeAgentWithPi(
       toolCalls: toolCallsList,
       usage,
       messages: returnMessages as Message[],
+      modelId,
+      provider,
     };
   } catch (error) {
     // Handle specific errors
@@ -1158,6 +1166,7 @@ export async function executeAgentWithPi(
             provider: candidate.provider,
             modelId: candidate.modelId,
             __attemptedModelRefs: [...attemptedModelRefs, nextKey],
+            __existingTrace: trace,
           });
         } catch (fallbackError) {
           runLog.error(
@@ -1189,7 +1198,7 @@ function handleAgentEvent(
   event: AgentSessionEvent,
   onEvent?: (event: AgentEvent) => void,
   trace?: TraceHandle,
-  activeToolSpans?: Map<string, SpanHandle>,
+  activeToolSpans?: Map<string, SpanHandle[]>,
   runLog?: ReturnType<typeof createLogger>,
 ): void {
   const tlog = runLog || toolLogger;
@@ -1222,13 +1231,15 @@ function handleAgentEvent(
         `>> ${event.toolName}`,
       );
 
-      // Start Langfuse span for this tool call
+      // Start Langfuse span for this tool call (FIFO queue to handle parallel same-tool calls)
       if (trace && activeToolSpans) {
         const span = trace.span({
           name: `tool:${event.toolName}`,
           input: event.args,
         });
-        activeToolSpans.set(event.toolName, span);
+        const existing = activeToolSpans.get(event.toolName) ?? [];
+        existing.push(span);
+        activeToolSpans.set(event.toolName, existing);
       }
 
       onEvent?.({
@@ -1248,12 +1259,13 @@ function handleAgentEvent(
         `<< ${event.toolName}`,
       );
 
-      // End Langfuse span for this tool call
+      // End Langfuse span for this tool call (FIFO — dequeue oldest span for this tool)
       if (activeToolSpans) {
-        const span = activeToolSpans.get(event.toolName);
-        if (span) {
-          span.end({ output: resultStr });
-          activeToolSpans.delete(event.toolName);
+        const queue = activeToolSpans.get(event.toolName);
+        if (queue?.length) {
+          const span = queue.shift();
+          span?.end({ output: resultStr });
+          if (!queue.length) activeToolSpans.delete(event.toolName);
         }
       }
 

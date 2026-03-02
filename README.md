@@ -116,8 +116,8 @@ Open `http://localhost:3000`.
 kai-brain requires a JWT for authentication. Generate one and set it in the browser console:
 
 ```bash
-# Generate a JWT (uses JWT_SECRET from your .env)
-node -e "
+# Generate a JWT (reads JWT_SECRET from your .env)
+JWT_SECRET="$(grep '^JWT_SECRET=' .env | cut -d= -f2)" node -e "
 const crypto = require('crypto');
 const secret = process.env.JWT_SECRET || 'dev-secret-change-me';
 const header = Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
@@ -130,7 +130,7 @@ console.log(header+'.'+payload+'.'+sig);
 Then in the browser console at `http://localhost:3000`:
 
 ```js
-localStorage.setItem("kai_token", "<paste-token-here>");
+localStorage.setItem("kai_token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc3MjQwOTE2MCwiZXhwIjoxODAzOTQ1MTYwfQ.B6yis4lmPP7TaU-W9TThx2JY2zCt6rzT-erFB1AQSF0");
 ```
 
 Refresh the page.

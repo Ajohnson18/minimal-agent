@@ -466,6 +466,8 @@ export function createSpawnSubagentTool(options: {
   };
   /** Pre-resolved user context passed down to subagents */
   userContext?: UserContext;
+  /** Parent trace ID for linking subagent traces in Langfuse */
+  parentTraceId?: string;
   onResult?: (runId: string, result: SubagentRun) => void;
 }): ToolDefinition {
   const { userId, sessionId, onResult } = options;
@@ -781,6 +783,7 @@ Actions:
           announceMode,
           abortSignal: mergeAbortSignals(signal, abortController.signal),
           parentUserContext: options.userContext,
+          parentTraceId: options.parentTraceId,
         });
         startBackgroundSubagentRun(replacementRunId, replacementRun, spawnPromise);
 
@@ -935,6 +938,7 @@ Actions:
         abortSignal: mergeAbortSignals(signal, abortController.signal),
         deliveryContext: effectiveDeliveryContext,
         parentUserContext: options.userContext,
+        parentTraceId: options.parentTraceId,
       });
       startBackgroundSubagentRun(runId, run, spawnPromise);
 
