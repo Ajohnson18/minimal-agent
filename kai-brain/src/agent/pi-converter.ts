@@ -93,6 +93,7 @@ export function createCustomTools(options: {
   deliveryContext?: {
     externalId: string;
   };
+  parentTraceId?: string;
 }): ToolDefinition[] {
   const { userId, sessionId } = options;
 
@@ -172,6 +173,7 @@ export function createCustomTools(options: {
       currentDepth: options.subagentDepth,
       deliveryContext: options.deliveryContext,
       userContext: options.userContext,
+      parentTraceId: options.parentTraceId,
     }),
     createCronTool({ userId, sessionId }),
 
@@ -314,6 +316,7 @@ export function getPiTools(options: {
   userContext?: UserContext;
   sandboxContainer?: string;
   sessionSource?: string | null;
+  parentTraceId?: string;
 }): {
   builtInTools: BuiltInTool[];
   customTools: ToolDefinition[];
@@ -330,6 +333,7 @@ export function getPiTools(options: {
     userContext: options.userContext,
     sandboxContainer: options.sandboxContainer,
     sessionSource: options.sessionSource,
+    parentTraceId: options.parentTraceId,
   });
 
   const policy = options.userContext?.config?.toolPolicy;

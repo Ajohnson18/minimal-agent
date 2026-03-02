@@ -46,6 +46,7 @@ export function classifyFailoverError(value: unknown): FailoverErrorDecision {
     message.includes("unauthorized") ||
     message.includes("forbidden") ||
     message.includes("invalid api key") ||
+    message.includes("no api key found") ||
     message.includes("authentication") ||
     message.includes("auth failed") ||
     message.includes("permission denied")

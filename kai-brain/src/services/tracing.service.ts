@@ -127,6 +127,7 @@ export interface GenerationParams {
   model: string;
   input?: unknown;
   metadata?: Record<string, unknown>;
+  startTime?: number;
 }
 
 export interface GenerationEndParams {
@@ -207,10 +208,8 @@ export function startTrace(params: {
       sessionId: params.sessionId,
       userId: params.userId,
       input: params.input,
-      metadata: {
-        ...params.metadata,
-        parentTraceId: params.parentTraceId,
-      },
+      metadata: params.metadata,
+      ...(params.parentTraceId ? { parentTraceId: params.parentTraceId } : {}),
     });
 
     const traceId = trace.id;
@@ -225,6 +224,7 @@ export function startTrace(params: {
             model: genParams.model,
             input: genParams.input,
             metadata: genParams.metadata,
+            startTime: genParams.startTime ? new Date(genParams.startTime) : undefined,
           });
 
           return {

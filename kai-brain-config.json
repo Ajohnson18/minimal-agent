@@ -3,16 +3,16 @@
 
   "agent": {
     "model": {
-      "primary": "claude-sonnet-4-6",
-      "fallback": "gemini-2.5-flash",
-      "provider": "vertex",
+      "primary": "claude-sonnet-4-20250514",
+      "fallback": "claude-haiku-4-5-20251001",
+      "provider": "anthropic",
       "embedding": "text-embedding-004"
     },
     "routing": {
-      "simple": "gemini-2.5-flash",
-      "medium": "claude-sonnet-4-6@default",
+      "simple": "claude-haiku-4-5-20251001",
+      "medium": "claude-sonnet-4-20250514",
       "complex": "claude-opus-4-6",
-      "vision": "gemini-2.5-flash"
+      "vision": "claude-sonnet-4-20250514"
     },
     "context": {
       "maxTokens": 100000,
@@ -28,10 +28,10 @@
 
   "subagents": {
     "models": {
-      "research": "gemini-2.5-flash",
-      "analyze": "gemini-2.5-pro",
-      "code": "gemini-2.5-flash",
-      "general": "gemini-2.5-flash"
+      "research": "claude-haiku-4-5-20251001",
+      "analyze": "claude-sonnet-4-20250514",
+      "code": "claude-haiku-4-5-20251001",
+      "general": "claude-haiku-4-5-20251001"
     },
     "orchestration": {
       "mode": "async",
